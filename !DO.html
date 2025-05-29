@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Минимум функции — Метод золотого сечения</title>
+  <style>
+    #graph {
+      border: 1px solid black;
+    }
+    label {
+      display: block;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Минимум функции (метод золотого сечения)</h2>
+  <form id="search-form">
+    <label>
+      Левая граница (a):
+      <input type="number" step="any" id="left" value="-3">
+    </label>
+    <label>
+      Правая граница (b):
+      <input type="number" step="any" id="right" value="3">
+    </label>
+    <label>
+      Точность (&epsilon;):
+      <input type="number" step="any" id="eps" value="0.001">
+    </label>
+    <label>
+      Функция f(x):
+      <input type="text" id="func" value="x*x">
+      <span style="color: grey;">(например: x*x-3*x+2)</span>
+    </label>
+    <button type="button" id="run">Найти точку</button>
+  </form>
+  <p id="result"></p>
+  <canvas id="graph" width="500" height="350"></canvas>
+  <script>
+    // Безопасный парсер функции (ограничим только x и математику)
+    function buildFunc(str) {
+      return new Function('x', 'with (Math) { return ' + str + '; }');
+    }
+
+    // Метод золотого сечения
+    function goldenSectionSearch(f, a, b, eps) {
+      const phi = (1 + Math.sqrt(5)) / 2;
+      let x1 = b - (b - a) / phi;
+      let x2 = a + (b - a) / phi;
+      let f1 = f(x1), f2 = f(x2);
+
+      while (Math.abs(b - a) > eps) {
+        if (f1 > f2) {
+          a = x1;
+          x1 = x2; f1 = f2;
+          x2 = a + (b - a) / phi; f2 = f(x2);
+        } else {
+          b = x2;
+          x2 = x1; f2 = f1;
+          x1 = b - (b - a) / phi; f1 = f(x1);
+        }
+      }
+      const xmin = (a + b) / 2;
+      return xmin;
+    }
+
+    function drawGraph(ctx, f, a, b, xmin, ymin, ymax) {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+      const w = ctx.canvas.width, h = ctx.canvas.height;
+      // Сетка и оси
+      ctx.strokeStyle = '#bbb';
+      ctx.beginPath();
+      for (let i = 0; i <= 10; ++i) {
+        let x = i * w / 10;
+        ctx.moveTo(x, 0); ctx.lineTo(x, h);
+      }
+      for (let i = 0; i <= 10; ++i) {
+        let y = i * h / 10;
+        ctx.moveTo(0, y); ctx.lineTo(w, y);
+      }
+      ctx.stroke();
+
+      // Ось X и Y
+      ctx.strokeStyle = '#333';
+      ctx.beginPath();
+      ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+      ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h);
+      ctx.stroke();
+
+      // График функции
+      ctx.strokeStyle = 'blue';
+      ctx.beginPath();
+
+      for (let px = 0; px < w; ++px) {
+        let x = a + (px / w) * (b - a);
+        let y = f(x);
+        // Преобразование координат
+        let py = h - ((y - ymin) / (ymax - ymin)) * h;
+        if (px === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Точка минимума
+      let pxMin = ((xmin - a) / (b - a)) * w;
+      let yMin = f(xmin);
+      let pyMin = h - ((yMin - ymin) / (ymax - ymin)) * h;
+
+      ctx.fillStyle = 'red';
+      ctx.beginPath();
+      ctx.arc(pxMin, pyMin, 6, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Координаты минимума
+      ctx.fillStyle = 'black';
+      ctx.font = 'bold 13px monospace';
+      ctx.fillText(
+        `min: (${xmin.toFixed(5)}, ${yMin.toFixed(5)})`,
+        pxMin + 10,
+        pyMin - 10
+      );
+    }
+
+    document.getElementById('run').onclick = function() {
+      const a = parseFloat(document.getElementById('left').value);
+      const b = parseFloat(document.getElementById('right').value);
+      const eps = parseFloat(document.getElementById('eps').value);
+      let f;
+      try {
+        f = buildFunc(document.getElementById('func').value);
+        // тест функции
+        f((a + b) / 2);
+      } catch (e) {
+        document.getElementById('result').textContent = 'Ошибка в функции: ' + e.message;
+        return;
+      }
+
+      let xmin = goldenSectionSearch(f, a, b, eps);
+      let ymin = f(xmin);
+
+      document.getElementById('result').textContent =
+        `x = ${xmin.toFixed(6)}, y = ${ymin.toFixed(6)}`;
+
+      // Для масштабирования графика ищем min и max на 100 точках
+      let yMin = Number.POSITIVE_INFINITY, yMax = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i <= 100; ++i) {
+        let x = a + (i / 100) * (b - a);
+        let y = f(x);
+        if (isFinite(y)) {
+          if (y < yMin) yMin = y;
+          if (y > yMax) yMax = y;
+        }
+      }
+      if (yMin === yMax) {
+        yMin -= 1; yMax += 1;
+      }
+      drawGraph(
+        document.getElementById('graph').getContext('2d'),
+        f, a, b, xmin, yMin, yMax
+      );
+    };
+  </script>
+</body>
+</html>
